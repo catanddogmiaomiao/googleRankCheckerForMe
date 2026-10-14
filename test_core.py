@@ -60,7 +60,7 @@ class Tests(unittest.TestCase):
         provider.read_results = lambda: []
         with patch.object(provider, 'wait_for_results', return_value=(provider.read_results(), 'ok')):
             result = provider.check('example.com', 'us', 'en', 'test', threading.Event(), 100)
-        self.assertEqual(result.status, 'incomplete')
+        self.assertEqual(result.status, 'parse_error')
     def test_cancel(self):
         cancel = threading.Event(); cancel.set()
         result = GoogleBrowserProvider().check('example.com', 'us', 'en', 'test', cancel)

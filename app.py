@@ -137,7 +137,7 @@ class App(QWidget):
                         try:
                             result = provider.check(domain, country, language, word, self.cancel, depth)
                             self.events.put(('result', index, result))
-                            if result.status == 'blocked':
+                            if result.status in ('blocked', 'parse_error'):
                                 break
                         except Exception as error:
                             detail = str(error) if isinstance(error, RuntimeError) else '浏览器查询失败，请检查网络或浏览器窗口。'
@@ -180,7 +180,7 @@ class App(QWidget):
                     else:
                         result = event[2]
                         self.results.append(result)
-                        rank = str(result.position) if result.position else {'ok': f'>{result.depth}', 'incomplete': '结果不足', 'cancelled': '已取消', 'blocked': '需要手动处理'}[result.status]
+                        rank = str(result.position) if result.position else {'ok': f'>{result.depth}', 'incomplete': '结果不足', 'cancelled': '已取消', 'blocked': '需要手动处理', 'parse_error': '解析失败'}[result.status]
                         try:
                             old = self.history.previous(result)
                             previous, change = comparison(result, old)

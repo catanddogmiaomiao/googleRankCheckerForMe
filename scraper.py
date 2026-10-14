@@ -130,7 +130,7 @@ class GoogleBrowserProvider:
                 return result
             if not links:
                 self.diagnostics('搜索页面未识别到结果')
-                result.status, result.detail = 'incomplete', f'仅解析到 {len(seen)} 条；页面无结果或结构变化'
+                result.status, result.detail = 'parse_error', f'解析失败：仅读取 {len(seen)} 条，已停止本批查询；请检查 diagnostics'
                 return result
             self.scroll_results(cancel)
             links = self.read_results() or links

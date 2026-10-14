@@ -3,14 +3,15 @@ from urllib.parse import urlsplit, parse_qs, urljoin
 import re
 
 EXTRACT_SCRIPT = r'''() => {
-  const root = document.querySelector('#search') || document.querySelector('#rso') || document.querySelector('#main');
+  const root = document.querySelector('#rso') || document.querySelector('#search') || document.querySelector('#main');
   if (!root) return [];
   const results = [];
   for (const title of root.querySelectorAll('h3')) {
     const a = title.closest('a') || title.querySelector('a') || title.parentElement.querySelector('a[href]');
     if (!a || !title.getClientRects().length) continue;
     if (a.closest('#tads, #tadsb, [data-text-ad], [data-google-query-id]')) continue;
-    results.push(a.href);
+    const cite = a.querySelector('cite') || title.parentElement.querySelector('cite');
+    results.push({href: a.href, displayed: cite ? cite.innerText : ''});
   }
   return results;
 }'''
@@ -18,7 +19,7 @@ EXTRACT_SCRIPT = r'''() => {
 
 def destination(url):
     parsed = urlsplit(url)
-    if parsed.hostname and (parsed.hostname == 'google.com' or parsed.hostname.endswith('.google.com')):
+    if parsed.hostname in ('google.com', 'www.google.com'):
         if parsed.path == '/url':
             params = parse_qs(parsed.query)
             url = (params.get('q') or params.get('url') or [''])[0]
@@ -28,7 +29,22 @@ def destination(url):
 
 
 def read_results(page):
-    return [link for link in map(destination, page.evaluate(EXTRACT_SCRIPT)) if link]
+    results = []
+    for item in page.evaluate(EXTRACT_SCRIPT):
+        if isinstance(item, str):
+            link = destination(item)
+        else:
+            link = destination(item['href'])
+            if not link:
+                # Encrypted /goto URLs are opaque. Use only the domain actually
+                # displayed in the result, never invent the missing page path.
+                displayed = item.get('displayed', '').strip()
+                match = re.match(r'https?://([^\s/›…]+)', displayed)
+                if match and '.' in match[1]:
+                    link = 'https://' + match[1].rstrip('.') + '/'
+        if link:
+            results.append(link)
+    return results
 
 def has_next(page):
     return bool(next_url(page))
