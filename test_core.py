@@ -34,8 +34,8 @@ class Tests(unittest.TestCase):
         cancel = threading.Event()
         with patch.object(provider, 'wait_for_results', side_effect=[
                 (['https://other.org/1'], 'ok'), (['https://example.com'], 'ok')]), \
-                patch('scraper.next_url', return_value='https://www.google.com/search?q=test&start=10'), \
-                patch.object(cancel, 'wait', return_value=False):
+                patch('scraper.click_next', side_effect=lambda page: (setattr(page, 'url', 'https://www.google.com/search?q=test&start=10') or True)), \
+                patch('scraper.random.uniform', return_value=0):
             result = provider.check('example.com', 'us', 'en', 'test', cancel)
         self.assertEqual(result.position, 2)
         self.assertIn('start=10', provider.page.url)

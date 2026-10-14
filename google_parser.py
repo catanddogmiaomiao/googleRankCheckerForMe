@@ -1,5 +1,6 @@
 """Google DOM selectors and link normalization; update this module when layout changes."""
 from urllib.parse import urlsplit, parse_qs, urljoin
+import re
 
 EXTRACT_SCRIPT = r'''() => {
   const root = document.querySelector('#search') || document.querySelector('#rso') || document.querySelector('#main');
@@ -31,6 +32,25 @@ def read_results(page):
 
 def has_next(page):
     return bool(next_url(page))
+
+
+def click_next(page):
+    """Click the actual Next control, with pagination URL as a fallback."""
+    control = page.locator('a#pnnext:visible').first
+    if not control.count():
+        control = page.get_by_role('link', name=re.compile(r'^(Next|下一页|下页|次へ|Suivant|Weiter)(\s|$)', re.I)).first
+    before = page.url
+    if control.count() and control.is_visible():
+        control.scroll_into_view_if_needed(timeout=5000)
+        control.click(timeout=10000)
+    else:
+        target = next_url(page)
+        if not target:
+            return False
+        page.goto(target, wait_until='domcontentloaded', timeout=30000)
+    page.wait_for_function('(old) => location.href !== old', arg=before, timeout=15000)
+    page.wait_for_load_state('domcontentloaded', timeout=15000)
+    return True
 
 
 def next_url(page):

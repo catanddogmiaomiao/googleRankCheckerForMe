@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit, parse_qs
 from core import RankResult, matches
 
-from google_parser import read_results, next_url, is_challenge
+from google_parser import read_results, click_next, is_challenge
 
 
 class GoogleBrowserProvider:
@@ -119,11 +119,11 @@ class GoogleBrowserProvider:
                 result.status, result.detail = 'cancelled', '已取消'
                 return result
             self.notify(f'正在读取「{keyword}」第 {page_number + 1} 页…')
-            try:
-                self.page.goto(target,
-                               wait_until='domcontentloaded', timeout=30000)
-            except Exception:
-                raise RuntimeError('Google 页面加载失败，请检查网络是否能访问 Google。') from None
+            if page_number == 0:
+                try:
+                    self.page.goto(target, wait_until='domcontentloaded', timeout=30000)
+                except Exception:
+                    raise RuntimeError('Google 页面加载失败，请检查网络是否能访问 Google。') from None
             links, state = self.wait_for_results(cancel)
             if state in ('blocked', 'cancelled'):
                 result.status, result.detail = state, '手动处理超时' if state == 'blocked' else '已取消'
@@ -149,14 +149,26 @@ class GoogleBrowserProvider:
                     result.detail = f'已读取前 {depth} 条解析结果，未找到域名'
                     return result
             self.notify(f'第 {page_number + 1} 页读取 {added} 条，累计 {len(seen)} 条')
-            target = next_url(self.page)
-            if not added or not target:
-                if not target:
-                    self.diagnostics('未识别到下一页链接')
-                break
+            if not added:
+                self.diagnostics('翻页后重复上一页结果')
+                result.status, result.detail = 'incomplete', f'翻页失败：页面结果重复，已读取 {len(seen)} 条'
+                return result
             self.notify(f'已读取 {len(seen)} 条，等待几秒后翻页…')
             until = time.monotonic() + random.uniform(4, 7)
             while time.monotonic() < until and not cancel.is_set():
                 self.page.wait_for_timeout(200)
+            if cancel.is_set():
+                result.status, result.detail = 'cancelled', '已取消'
+                return result
+            self.notify(f'正在点击 Next，前往第 {page_number + 2} 页（已读取 {len(seen)} 条）…')
+            try:
+                if not click_next(self.page):
+                    self.diagnostics('未找到下一页按钮')
+                    result.status, result.detail = 'incomplete', f'已读取 {len(seen)} 条；未找到下一页按钮，未达到查询深度'
+                    return result
+            except Exception:
+                self.diagnostics('点击 Next 后未成功加载新页面')
+                result.status, result.detail = 'incomplete', f'翻页失败：已读取 {len(seen)} 条，请检查浏览器页面'
+                return result
         result.status, result.detail = 'incomplete', f'仅解析到 {len(seen)} 条结果，未找到域名'
         return result
