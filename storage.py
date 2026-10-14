@@ -1,12 +1,14 @@
 """Local history, scoped by domain, country, language, device and depth."""
 import sqlite3
+import sys
 from contextlib import closing
 from pathlib import Path
 
 
 class History:
     def __init__(self, path=None):
-        self.path = path or Path(__file__).with_name('rankings.sqlite3')
+        directory = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+        self.path = path or directory / 'rankings.sqlite3'
         with closing(sqlite3.connect(self.path)) as db:
             db.execute('''CREATE TABLE IF NOT EXISTS rankings (
                 id INTEGER PRIMARY KEY, checked_at TEXT, domain TEXT, country TEXT,

@@ -38,3 +38,24 @@ python -m playwright install chromium
 运行 python -m unittest -v 验证本地逻辑，不请求 Google。
 
 Playwright 文档：https://playwright.dev/python/docs/browsers
+
+## 手动打包 Windows 程序
+
+在项目目录打开 PowerShell，使用同一个 Python 环境执行：
+
+```powershell
+python -m pip install -r requirements-build.txt
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path (Get-Location) 'browsers'
+python -m playwright install chromium
+python -m PyInstaller --clean --noconfirm rank_checker.spec
+```
+
+输出为 `dist/搜索排名检查器/搜索排名检查器.exe`。这是目录版，请保留整个 `dist/搜索排名检查器` 文件夹，包括 `_internal`，不要单独移动 exe。Chromium 随目录打包，运行时无需额外安装 Python 或浏览器。
+
+spec 使用 `assets/app.ico` 作为程序图标，包含 16、24、32、48、64、128、256 像素尺寸；图形界面也使用同一图标。`assets/app.svg` 是可编辑源图。
+
+打包后的历史数据库在 exe 同目录生成，更新程序时保留 `rankings.sqlite3`。请把程序放在有写入权限的目录。源码运行时数据库仍保存在项目目录。
+
+打包需要足够磁盘空间，建议至少预留 2 GB。升级 Playwright 后，应重新执行浏览器安装和打包，确保浏览器版本匹配。当前已验证 spec 语法、图标和本地测试，尚未完整构建 exe。
+
+打包机制参考：[PyInstaller spec 文档](https://pyinstaller.org/en/stable/spec-files.html)、[Playwright 浏览器路径配置](https://playwright.dev/python/docs/browsers)。

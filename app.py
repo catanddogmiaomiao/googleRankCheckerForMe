@@ -1,4 +1,6 @@
 import sys
+from pathlib import Path
+from PyQt6.QtGui import QIcon
 import random
 import threading
 import queue
@@ -199,6 +201,8 @@ class App(QWidget):
 
 def main():
     app = QApplication(sys.argv)
+    resource_root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+    app.setWindowIcon(QIcon(str(resource_root / 'assets' / 'app.ico')))
     app.setStyle('Fusion')
     window = App()
     window.show()

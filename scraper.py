@@ -1,5 +1,8 @@
 """Visible Chromium scraper. Challenges are handled by the user, never bypassed."""
 import time
+import os
+import sys
+from pathlib import Path
 import random
 from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit, parse_qs
@@ -13,6 +16,10 @@ class GoogleBrowserProvider:
         self.notify = notify
 
     def __enter__(self):
+        if getattr(sys, 'frozen', False):
+            os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(Path(sys._MEIPASS) / 'browsers')
+        elif (Path(__file__).parent / 'browsers').is_dir():
+            os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(Path(__file__).parent / 'browsers')
         from playwright.sync_api import sync_playwright
         self.runtime = sync_playwright().start()
         try:
