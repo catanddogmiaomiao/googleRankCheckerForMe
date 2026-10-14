@@ -139,9 +139,11 @@ class GoogleBrowserProvider:
                 if url in seen:
                     continue
                 seen.add(url)
+                result.scanned_count = len(seen)
                 added += 1
                 if matches(url, domain):
                     result.position, result.url = len(seen), url
+                    result.detail = f'已读取 {len(seen)} 条，找到目标域名'
                     return result
                 if len(seen) == depth:
                     result.detail = f'已读取前 {depth} 条解析结果，未找到域名'

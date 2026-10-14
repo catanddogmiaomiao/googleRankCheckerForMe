@@ -63,8 +63,8 @@ class App(QWidget):
         self.progress = QProgressBar()
         self.progress.setValue(0)
         layout.addWidget(self.progress)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(['关键词', '当前排名', '上次排名', '变化', '匹配链接 / 说明'])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(['关键词', '当前排名', '上次排名', '变化', '已读取', '匹配链接 / 说明'])
         self.table.verticalHeader().hide()
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -72,7 +72,7 @@ class App(QWidget):
         self.table.setWordWrap(False)
         self.table.setColumnWidth(0, 270)
         self.table.setColumnWidth(1, 130)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table, 1)
         self.status = QLabel('准备就绪 · 查询时自动打开 Chromium')
         layout.addWidget(self.status)
@@ -149,8 +149,8 @@ class App(QWidget):
                 self.events.put(('done',))
         threading.Thread(target=worker, daemon=True).start()
 
-    def set_row(self, row, keyword, rank, detail, previous='—', change='—'):
-        for col, text in enumerate((keyword, rank, previous, change, detail)):
+    def set_row(self, row, keyword, rank, detail, previous='—', change='—', count=0):
+        for col, text in enumerate((keyword, rank, previous, change, str(count), detail)):
             item = QTableWidgetItem(text)
             item.setToolTip(text)
             self.table.setItem(row, col, item)
@@ -189,7 +189,7 @@ class App(QWidget):
                         except Exception:
                             previous, change = '—', '—'
                             detail = (result.url or result.detail) + '（历史保存失败）'
-                        self.set_row(row, result.keyword, rank, detail, previous, change)
+                        self.set_row(row, result.keyword, rank, detail, previous, change, result.scanned_count)
                     self.progress.setValue(row + 1)
                     self.status.setText(f'已处理 {row + 1}/{self.table.rowCount()}')
         except queue.Empty:

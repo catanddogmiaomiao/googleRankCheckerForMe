@@ -40,5 +40,6 @@ class RankResult:
     provider: str = 'playwright-google'
     device: str = 'desktop'
     depth: int = 100
+    scanned_count: int = 0
 
 
