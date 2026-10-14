@@ -1,0 +1,40 @@
+# 搜索排名检查器
+
+本机 PyQt6 + Playwright / Chromium。无需 API，不登录 Google，不使用代理池，不绕过 CAPTCHA。
+
+## 安装和启动
+
+需要 Python 3.10+，先释放足够磁盘空间（建议至少 1 GB）。在本目录执行：
+
+```powershell
+python -m pip install -r requirements.txt
+python -m playwright install chromium
+```
+
+然后双击 start.pyw（需 Windows 已关联 Python 的 .pyw 文件），或者运行 python app.py。
+
+## 使用
+
+输入域名、国家、语言、查询深度（1–100，默认 100）和关键词（每行一个，最多 20 个）。查询自动打开 Chromium，批次结束时关闭。页间等待 4–7 秒，关键词间等待 6–12 秒，串行执行。
+
+遇到验证码或同意页面，最多等待 3 分钟，请在 Chromium 窗口手动处理。超时停止批次，不尝试绕过 CAPTCHA。取消在当前网页加载结束后生效，加载超时 30 秒。
+
+国家 gl 和语言 hl 只是搜索偏好，真实出口 IP 仍影响地区结果，不保证所选国家当地的排名。网络必须能访问 Google。
+
+排名按解析到的网页结果顺序计算，支持子域名，尽量排除广告和特殊模块。达到指定深度未找到显示 >深度；结果不足或结构变化显示结果不足。随机等待不能保证不触发限制。
+
+## SQLite 历史
+
+同目录 rankings.sqlite3 保存 UTC 日期时间、关键词、排名、URL、域名、国家、语言、设备、查询深度和状态。界面显示当前、上次排名及变化。按同一域名、国家、语言、设备和深度比较，只使用成功记录。37→20 显示 ↑17；超出范围无法得出准确差值，显示进入/离开范围。没有历史显示 —。
+
+## 模块
+
+- google_parser.py：DOM 选择器、结果链接、下一页和验证页识别，页面改版优先修改这里。
+- scraper.py：Chromium 生命周期、分页、等待及手工验证流程。
+- core.py：域名匹配和结果模型。
+- storage.py：SQLite 保存和历史比较。
+- app.py：PyQt6 界面。
+
+运行 python -m unittest -v 验证本地逻辑，不请求 Google。
+
+Playwright 文档：https://playwright.dev/python/docs/browsers
