@@ -1,9 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect x="8" y="8" width="240" height="240" rx="54" fill="#2563eb"/>
-  <rect x="48" y="137" width="25" height="53" rx="6" fill="#93c5fd"/>
-  <rect x="86" y="111" width="25" height="79" rx="6" fill="#bfdbfe"/>
-  <rect x="124" y="83" width="25" height="107" rx="6" fill="#ffffff"/>
-  <circle cx="160" cy="86" r="39" fill="#2563eb" stroke="#ffffff" stroke-width="13"/>
-  <path d="M188 115 L211 138" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
-  <path d="M47 207 H205" stroke="#bfdbfe" stroke-width="8" stroke-linecap="round"/>
+<defs><linearGradient id="bg" x2="0.8" y2="1"><stop stop-color="#183b50"/><stop offset="1" stop-color="#092735"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="58" fill="url(#bg)"/>
+<!-- Curious cat detective, with one eye magnified. -->
+<path d="M61 108 L53 52 Q54 42 65 48 L100 74 Q128 62 153 75 L189 48 Q201 43 200 57 L193 112 Q206 148 185 179 Q161 207 123 205 Q84 206 61 176 Q42 145 61 108Z" fill="#ffc66d" stroke="#092735" stroke-width="7" stroke-linejoin="round"/>
+<path d="M64 63 L70 100 L92 80Z M187 64 L164 83 L190 99Z" fill="#ef8d70"/>
+<path d="M58 106 Q120 85 194 106" fill="none" stroke="#b97745" stroke-width="5"/>
+<ellipse cx="88" cy="128" rx="8" ry="12" fill="#153747"/>
+<path d="M118 155 Q126 148 134 155 L126 163Z" fill="#153747"/>
+<path d="M126 164 Q116 178 106 167 M126 164 Q135 178 145 167" fill="none" stroke="#153747" stroke-width="5" stroke-linecap="round"/>
+<path d="M55 147 L78 151 M54 160 L76 160" stroke="#b97745" stroke-width="4" stroke-linecap="round"/>
+<!-- Oversized teal magnifying glass -->
+<circle cx="165" cy="128" r="40" fill="#d1f7f1" stroke="#0c574f" stroke-width="10"/>
+<ellipse cx="164" cy="129" rx="10" ry="16" fill="#123a43"/>
+<path d="M145 107 Q157 99 172 102" fill="none" stroke="white" stroke-width="6" stroke-linecap="round"/>
+<path d="M193 158 L219 191" stroke="#092735" stroke-width="23" stroke-linecap="round"/>
+<path d="M193 158 L219 191" stroke="#5fe0c1" stroke-width="14" stroke-linecap="round"/>
+<!-- Tiny discovery sparkle -->
+<path d="M211 65 L215 78 L228 82 L215 86 L211 99 L207 86 L194 82 L207 78Z" fill="#5fe0c1"/>
+<path d="M85 209 Q121 198 158 209" fill="none" stroke="#5fe0c1" stroke-width="10" stroke-linecap="round"/>
 </svg>
