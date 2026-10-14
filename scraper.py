@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit, parse_qs
 from core import RankResult, matches
 
-from google_parser import read_results, has_next, is_challenge
+from google_parser import read_results, next_url, is_challenge
 
 
 class GoogleBrowserProvider:
@@ -40,37 +40,54 @@ class GoogleBrowserProvider:
     def read_results(self):
         return read_results(self.page)
 
+    def wait_for_results(self, cancel):
+        deadline = time.monotonic() + 20
+        manual_deadline = None
+        while not cancel.is_set():
+            if self.page.is_closed():
+                raise RuntimeError('查询浏览器已关闭。')
+            try:
+                # A hidden/stale CAPTCHA iframe must not block a loaded result page.
+                links = self.read_results()
+                if links and '/sorry/' not in self.page.url and 'consent.google.' not in self.page.url:
+                    return links, 'ok'
+                challenged = is_challenge(self.page)
+            except Exception:
+                # Manual completion can destroy the old document during navigation.
+                if time.monotonic() >= (manual_deadline or deadline):
+                    return [], 'blocked' if manual_deadline else 'incomplete'
+                self.page.wait_for_timeout(300)
+                continue
+            if challenged:
+                if manual_deadline is None:
+                    manual_deadline = time.monotonic() + 180
+                    self.notify('请在浏览器手动处理验证码，完成后自动继续…')
+                if time.monotonic() >= manual_deadline:
+                    return [], 'blocked'
+            elif time.monotonic() >= (manual_deadline or deadline):
+                return [], 'incomplete'
+            self.page.wait_for_timeout(500)
+        return [], 'cancelled'
+
     def check(self, domain, country, language, keyword, cancel, depth=100):
         result = RankResult(domain, country, language, keyword, datetime.now(timezone.utc).isoformat())
         result.depth = depth
         seen = set()
+        target = 'https://www.google.com/search?' + urlencode(dict(q=keyword, gl=country, hl=language, pws=0))
         for page_number in range(15):
             if cancel.is_set():
                 result.status, result.detail = 'cancelled', '已取消'
                 return result
             self.notify(f'正在读取「{keyword}」第 {page_number + 1} 页…')
-            params = dict(q=keyword, gl=country, hl=language, pws=0, start=page_number * 10)
             try:
-                self.page.goto('https://www.google.com/search?' + urlencode(params),
+                self.page.goto(target,
                                wait_until='domcontentloaded', timeout=30000)
             except Exception:
                 raise RuntimeError('Google 页面加载失败，请检查网络是否能访问 Google。') from None
-            self.page.wait_for_timeout(1200)
-            links = self.read_results()
-            challenged = is_challenge(self.page)
-            if challenged:
-                self.notify('请在 Chromium 窗口手动完成验证码 / 同意页面，最多等待 3 分钟…')
-                deadline = time.monotonic() + 180
-                while time.monotonic() < deadline and not cancel.is_set():
-                    self.page.wait_for_timeout(500)
-                    if not is_challenge(self.page):
-                        links = self.read_results()
-                        if links:
-                            break
-                else:
-                    result.status = 'cancelled' if cancel.is_set() else 'blocked'
-                    result.detail = '已取消' if cancel.is_set() else '手动处理超时，请重新查询'
-                    return result
+            links, state = self.wait_for_results(cancel)
+            if state in ('blocked', 'cancelled'):
+                result.status, result.detail = state, '手动处理超时' if state == 'blocked' else '已取消'
+                return result
             if not links:
                 result.status, result.detail = 'incomplete', f'仅解析到 {len(seen)} 条；页面无结果或结构变化'
                 return result
@@ -86,8 +103,11 @@ class GoogleBrowserProvider:
                 if len(seen) == depth:
                     result.detail = f'已读取前 {depth} 条解析结果，未找到域名'
                     return result
-            if not added or not has_next(self.page):
+            self.notify(f'第 {page_number + 1} 页读取 {added} 条，累计 {len(seen)} 条')
+            target = next_url(self.page)
+            if not added or not target:
                 break
+            self.notify(f'已读取 {len(seen)} 条，等待几秒后翻页…')
             if cancel.wait(random.uniform(4, 7)):
                 result.status, result.detail = 'cancelled', '已取消'
                 return result

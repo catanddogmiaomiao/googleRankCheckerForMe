@@ -14,6 +14,27 @@ class Page:
     def wait_for_timeout(self, *args): pass
 
 class Tests(unittest.TestCase):
+    def test_loaded_results_resume_without_challenge_check(self):
+        provider = GoogleBrowserProvider()
+        provider.page = Page()
+        provider.page.is_closed = lambda: False
+        provider.read_results = lambda: ['https://example.com']
+        with patch('scraper.is_challenge', side_effect=AssertionError('stale iframe')):
+            self.assertEqual(provider.wait_for_results(threading.Event()), (['https://example.com'], 'ok'))
+
+    def test_pagination_after_first_page(self):
+        provider = GoogleBrowserProvider()
+        provider.page = Page()
+        provider.page.goto = lambda target, **kwargs: setattr(provider.page, 'url', target)
+        cancel = threading.Event()
+        with patch.object(provider, 'wait_for_results', side_effect=[
+                (['https://other.org/1'], 'ok'), (['https://example.com'], 'ok')]), \
+                patch('scraper.next_url', return_value='https://www.google.com/search?q=test&start=10'), \
+                patch.object(cancel, 'wait', return_value=False):
+            result = provider.check('example.com', 'us', 'en', 'test', cancel)
+        self.assertEqual(result.position, 2)
+        self.assertIn('start=10', provider.page.url)
+
     def test_domains(self):
         self.assertEqual(normalize_domain('https://www.Example.com/path'), 'example.com')
         self.assertTrue(matches('https://blog.example.com/a', 'example.com'))
@@ -25,12 +46,12 @@ class Tests(unittest.TestCase):
         provider = GoogleBrowserProvider()
         provider.page = Page()
         provider.read_results = lambda: [f'https://other.org/{i}' for i in range(60)]
-        with patch('scraper.is_challenge', return_value=False):
+        with patch.object(provider, 'wait_for_results', return_value=(provider.read_results(), 'ok')):
             result = provider.check('example.com', 'us', 'en', 'test', threading.Event(), 50)
         self.assertEqual(result.status, 'ok')
         self.assertEqual(result.depth, 50)
         provider.read_results = lambda: []
-        with patch('scraper.is_challenge', return_value=False):
+        with patch.object(provider, 'wait_for_results', return_value=(provider.read_results(), 'ok')):
             result = provider.check('example.com', 'us', 'en', 'test', threading.Event(), 100)
         self.assertEqual(result.status, 'incomplete')
     def test_cancel(self):
