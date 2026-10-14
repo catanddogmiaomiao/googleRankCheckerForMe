@@ -17,6 +17,8 @@ class Tests(unittest.TestCase):
     def test_loaded_results_resume_without_challenge_check(self):
         provider = GoogleBrowserProvider()
         provider.page = Page()
+        provider.scroll_results = lambda cancel: None
+        provider.diagnostics = lambda reason: None
         provider.page.is_closed = lambda: False
         provider.read_results = lambda: ['https://example.com']
         with patch('scraper.is_challenge', side_effect=AssertionError('stale iframe')):
@@ -25,6 +27,9 @@ class Tests(unittest.TestCase):
     def test_pagination_after_first_page(self):
         provider = GoogleBrowserProvider()
         provider.page = Page()
+        provider.scroll_results = lambda cancel: None
+        provider.diagnostics = lambda reason: None
+        provider.read_results = lambda: []
         provider.page.goto = lambda target, **kwargs: setattr(provider.page, 'url', target)
         cancel = threading.Event()
         with patch.object(provider, 'wait_for_results', side_effect=[
@@ -45,6 +50,8 @@ class Tests(unittest.TestCase):
     def test_depth_and_incomplete(self):
         provider = GoogleBrowserProvider()
         provider.page = Page()
+        provider.scroll_results = lambda cancel: None
+        provider.diagnostics = lambda reason: None
         provider.read_results = lambda: [f'https://other.org/{i}' for i in range(60)]
         with patch.object(provider, 'wait_for_results', return_value=(provider.read_results(), 'ok')):
             result = provider.check('example.com', 'us', 'en', 'test', threading.Event(), 50)

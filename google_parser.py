@@ -2,11 +2,11 @@
 from urllib.parse import urlsplit, parse_qs, urljoin
 
 EXTRACT_SCRIPT = r'''() => {
-  const root = document.querySelector('#search') || document.querySelector('#rso');
+  const root = document.querySelector('#search') || document.querySelector('#rso') || document.querySelector('#main');
   if (!root) return [];
   const results = [];
   for (const title of root.querySelectorAll('h3')) {
-    const a = title.closest('a');
+    const a = title.closest('a') || title.querySelector('a') || title.parentElement.querySelector('a[href]');
     if (!a || !title.getClientRects().length) continue;
     if (a.closest('#tads, #tadsb, [data-text-ad], [data-google-query-id]')) continue;
     results.push(a.href);
@@ -45,8 +45,8 @@ def next_url(page):
             offset = int(query.get('start', ['0'])[0])
         except ValueError:
             continue
-        if (parsed.hostname == urlsplit(page.url).hostname and parsed.path == '/search'
-                and query.get('q') == parse_qs(urlsplit(page.url).query).get('q')
+        if ((parsed.hostname or '').removeprefix('www.') == (urlsplit(page.url).hostname or '').removeprefix('www.') and parsed.path == '/search'
+                and (not query.get('q') or query.get('q') == parse_qs(urlsplit(page.url).query).get('q'))
                 and offset > current):
             valid.append((offset, parsed.geturl()))
     return min(valid)[1] if valid else ''

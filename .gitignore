@@ -9,3 +9,5 @@ preview.png
 build/
 dist/
 browsers/
+browser-profile/
+diagnostics/

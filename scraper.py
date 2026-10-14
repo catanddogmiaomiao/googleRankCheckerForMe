@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 import random
+import json
 from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit, parse_qs
 from core import RankResult, matches
@@ -23,9 +24,11 @@ class GoogleBrowserProvider:
         from playwright.sync_api import sync_playwright
         self.runtime = sync_playwright().start()
         try:
-            self.browser = self.runtime.chromium.launch(headless=False)
-            self.context = self.browser.new_context(viewport={'width': 1280, 'height': 900})
-            self.page = self.context.new_page()
+            self.data_root = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+            self.context = self.runtime.chromium.launch_persistent_context(
+                str(self.data_root / 'browser-profile'), headless=False,
+                viewport={'width': 1280, 'height': 900})
+            self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
         except Exception:
             self.runtime.stop()
             raise
@@ -33,16 +36,46 @@ class GoogleBrowserProvider:
 
     def __exit__(self, *args):
         try:
-            self.browser.close()
+            self.context.close()
         finally:
             self.runtime.stop()
 
     def read_results(self):
         return read_results(self.page)
 
+    def diagnostics(self, reason):
+        try:
+            directory = self.data_root / 'diagnostics'
+            directory.mkdir(exist_ok=True)
+            details = self.page.evaluate('''() => ({url: location.href, title: document.title,
+                headings: document.querySelectorAll('h3').length,
+                roots: ['search','rso','main'].filter(id => document.getElementById(id)),
+                headingLinks: [...document.querySelectorAll('h3')].slice(0,15).map(h => ({
+                    text: h.innerText, html: h.outerHTML, parent: h.parentElement.outerHTML.slice(0,1500)}))})''')
+            details['reason'] = reason
+            (directory / 'last-page.json').write_text(json.dumps(details, ensure_ascii=False, indent=2), encoding='utf-8')
+            self.page.screenshot(path=str(directory / 'last-page.png'))
+        except Exception:
+            pass
+
+    def scroll_results(self, cancel):
+        self.notify('搜索页面已打开，正在向下滚动并读取结果…')
+        # Ordinary scrolling triggers lazy loading; no stealth or CAPTCHA bypass.
+        for _ in range(12):
+            if cancel.is_set():
+                break
+            at_bottom = self.page.evaluate('''() => {
+                window.scrollBy(0, Math.max(600, innerHeight * 0.8));
+                return scrollY + innerHeight >= document.documentElement.scrollHeight - 10;
+            }''')
+            self.page.wait_for_timeout(300)
+            if at_bottom:
+                break
+
     def wait_for_results(self, cancel):
         deadline = time.monotonic() + 20
         manual_deadline = None
+        was_challenged = False
         while not cancel.is_set():
             if self.page.is_closed():
                 raise RuntimeError('查询浏览器已关闭。')
@@ -59,13 +92,20 @@ class GoogleBrowserProvider:
                 self.page.wait_for_timeout(300)
                 continue
             if challenged:
+                was_challenged = True
                 if manual_deadline is None:
                     manual_deadline = time.monotonic() + 180
                     self.notify('请在浏览器手动处理验证码，完成后自动继续…')
                 if time.monotonic() >= manual_deadline:
                     return [], 'blocked'
-            elif time.monotonic() >= (manual_deadline or deadline):
-                return [], 'incomplete'
+            else:
+                if was_challenged:
+                    self.notify('验证码已完成，正在识别搜索页面…')
+                    deadline = time.monotonic() + 20
+                    manual_deadline = None
+                    was_challenged = False
+                if time.monotonic() >= deadline:
+                    return [], 'incomplete'
             self.page.wait_for_timeout(500)
         return [], 'cancelled'
 
@@ -89,8 +129,11 @@ class GoogleBrowserProvider:
                 result.status, result.detail = state, '手动处理超时' if state == 'blocked' else '已取消'
                 return result
             if not links:
+                self.diagnostics('搜索页面未识别到结果')
                 result.status, result.detail = 'incomplete', f'仅解析到 {len(seen)} 条；页面无结果或结构变化'
                 return result
+            self.scroll_results(cancel)
+            links = self.read_results() or links
             added = 0
             for url in links:
                 if url in seen:
@@ -106,10 +149,12 @@ class GoogleBrowserProvider:
             self.notify(f'第 {page_number + 1} 页读取 {added} 条，累计 {len(seen)} 条')
             target = next_url(self.page)
             if not added or not target:
+                if not target:
+                    self.diagnostics('未识别到下一页链接')
                 break
             self.notify(f'已读取 {len(seen)} 条，等待几秒后翻页…')
-            if cancel.wait(random.uniform(4, 7)):
-                result.status, result.detail = 'cancelled', '已取消'
-                return result
+            until = time.monotonic() + random.uniform(4, 7)
+            while time.monotonic() < until and not cancel.is_set():
+                self.page.wait_for_timeout(200)
         result.status, result.detail = 'incomplete', f'仅解析到 {len(seen)} 条结果，未找到域名'
         return result
